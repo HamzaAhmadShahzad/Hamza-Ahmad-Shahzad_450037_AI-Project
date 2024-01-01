@@ -1,0 +1,180 @@
+import tkinter as tk
+import random
+
+class SnakeGame:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Snake Game")
+        self.width = self.master.winfo_screenwidth() - 100
+        self.height = self.master.winfo_screenheight() - 100
+        self.block_size = 20
+        self.canvas = tk.Canvas(master, width=self.width, height=self.height, bg="black")
+        self.canvas.pack()
+
+        self.snake = [(100, 100), (90, 100), (80, 100)]
+        self.snake_direction = "Right"
+        self.food_position = self.create_food()
+        self.score = 0
+
+        self.enemy_snake = [(300, 100), (310, 100), (320, 100)]
+        self.enemy_snake_direction = "Left"
+        self.enemy_timer = 200  # Set a time limit for the enemy snake
+        self.enemy_score = 0
+
+        self.obstacles = [(200, 200), (220, 200), (240, 200), (260, 200), (280, 200), (300, 200)]  # Example obstacles
+
+        self.master.bind("<Up>", lambda event: self.change_direction("Up"))
+        self.master.bind("<Down>", lambda event: self.change_direction("Down"))
+        self.master.bind("<Left>", lambda event: self.change_direction("Left"))
+        self.master.bind("<Right>", lambda event: self.change_direction("Right"))
+
+        self.create_obstacles()
+        self.update()
+
+    def create_food(self):
+        x = random.randint(0, (self.width - self.block_size) // self.block_size) * self.block_size
+        y = random.randint(0, (self.height - self.block_size) // self.block_size) * self.block_size
+        food_position = (x, y)
+        self.canvas.create_rectangle(x, y, x + self.block_size, y + self.block_size, fill="red", tags="food")
+        return food_position
+
+    def create_obstacles(self):
+        for obstacle in self.obstacles:
+            self.canvas.create_rectangle(
+                obstacle[0], obstacle[1], obstacle[0] + self.block_size, obstacle[1] + self.block_size, fill="gray",
+                tags="obstacle"
+            )
+
+    def change_direction(self, direction):
+        if (direction == "Up" and self.snake_direction != "Down") or \
+           (direction == "Down" and self.snake_direction != "Up") or \
+           (direction == "Left" and self.snake_direction != "Right") or \
+           (direction == "Right" and self.snake_direction != "Left"):
+            self.snake_direction = direction
+
+    def move_snake(self, snake):
+        head = list(snake[0])
+        if self.snake_direction == "Up":
+            head[1] -= self.block_size
+        elif self.snake_direction == "Down":
+            head[1] += self.block_size
+        elif self.snake_direction == "Left":
+            head[0] -= self.block_size
+        elif self.snake_direction == "Right":
+            head[0] += self.block_size
+
+        snake.insert(0, tuple(head))
+
+    def move_enemy_snake(self):
+        head = list(self.enemy_snake[0])
+
+        # Move towards the food
+        if head[0] < self.food_position[0]:
+            self.enemy_snake_direction = "Right"
+        elif head[0] > self.food_position[0]:
+            self.enemy_snake_direction = "Left"
+        elif head[1] < self.food_position[1]:
+            self.enemy_snake_direction = "Down"
+        elif head[1] > self.food_position[1]:
+            self.enemy_snake_direction = "Up"
+
+        if self.enemy_snake_direction == "Up":
+            head[1] -= self.block_size
+        elif self.enemy_snake_direction == "Down":
+            head[1] += self.block_size
+        elif self.enemy_snake_direction == "Left":
+            head[0] -= self.block_size
+        elif self.enemy_snake_direction == "Right":
+            head[0] += self.block_size
+
+        self.enemy_snake.insert(0, tuple(head))
+
+    def check_collisions(self, snake):
+        head = snake[0]
+
+        # Check for boundary collisions
+        if (
+            head[0] < 0
+            or head[0] >= self.width
+            or head[1] < 0
+            or head[1] >= self.height
+        ):
+            return True
+
+        # Check for self-collisions
+        if head in snake[1:]:
+            return True
+
+        # Check for collisions with obstacles
+        if head in self.obstacles:
+            return True
+
+        return False
+
+    def update(self):
+        self.move_snake(self.snake)
+        self.move_enemy_snake()
+
+        # Check collisions for both snakes
+        if self.check_collisions(self.snake):
+            self.game_over("Enemy")
+            return
+
+        if self.check_collisions(self.enemy_snake):
+            self.game_over("You")
+            return
+
+        # Check if the player's snake ate the food
+        if self.snake[0] == self.food_position:
+            self.score += 1
+            self.update_scoreboard()
+            self.canvas.delete("food")  # Remove previous food
+            self.food_position = self.create_food()
+
+        # Check if the enemy snake ate the food
+        if self.enemy_snake[0] == self.food_position:
+            self.enemy_score += 1
+            
+
+        # Draw the player's snake
+        self.canvas.delete("snake")
+        for segment in self.snake:
+            self.canvas.create_rectangle(
+                segment[0], segment[1], segment[0] + self.block_size, segment[1] + self.block_size, fill="green",
+                tags="snake"
+            )
+
+        # Draw the enemy snake
+        self.canvas.delete("enemy_snake")
+        for segment in self.enemy_snake:
+            self.canvas.create_rectangle(
+                segment[0], segment[1], segment[0] + self.block_size, segment[1] + self.block_size, fill="blue",
+                tags="enemy_snake"
+            )
+
+        # Draw the food
+        self.canvas.create_rectangle(
+            self.food_position[0], self.food_position[1],
+            self.food_position[0] + self.block_size, self.food_position[1] + self.block_size,
+            fill="red", tags="food"
+        )
+
+        self.master.after(200, self.update)  # Adjusted the delay to slow down the movement
+
+    def create_scoreboard(self):
+        self.score_label = tk.Label(self.master, text="Score: You - 0 | Enemy - 0")
+        self.score_label.pack()
+
+    def update_scoreboard(self):
+        self.score_label.config(text="Score: You - {} | Enemy - {}".format(self.score, self.enemy_score))
+
+    def game_over(self, winner):
+        self.master.unbind("<Key>")
+        game_over_label = tk.Label(self.master, text="Game Over! {} wins!".format(winner), font=("Helvetica", 16))
+        game_over_label.pack()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    game = SnakeGame(root)
+    root.mainloop()
+
